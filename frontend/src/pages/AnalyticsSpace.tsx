@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Activity, 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  Check, 
-  Layers, 
-  Tv, 
+import {
+  Activity,
+  Users,
+  UserCheck,
+  DollarSign,
+  TrendingUp,
+  Plus,
+  Trash2,
+  Edit3,
+  Check,
+  Layers,
+  Tv,
   Sparkles,
   Loader2,
   FileText,
@@ -27,10 +28,10 @@ import {
   ShieldX,
   Clock
 } from 'lucide-react';
-import { 
-  useBrands, 
-  useCreateBrand, 
-  useUpdateBrand, 
+import {
+  useBrands,
+  useCreateBrand,
+  useUpdateBrand,
   useDeleteBrand,
   usePacks,
   useCreatePack,
@@ -45,7 +46,7 @@ import type { ToastType } from '../context/ToastContext';
 import { CATEGORY_COLORS, GLOBAL_STRINGS } from '../constants/theme';
 import { useSettings, useUpdatePaymentQr } from '../hooks/useSettings';
 
-type Tab = 'overview' | 'brands' | 'packs' | 'payment-config' | 'payments';
+type Tab = 'overview' | 'brands' | 'packs' | 'payment-config';
 
 export const AnalyticsSpace: React.FC = () => {
   const { showToast } = useToast();
@@ -59,8 +60,8 @@ export const AnalyticsSpace: React.FC = () => {
 
   const filteredBrands = allBrands?.filter(brand => {
     const matchesCategory = !selectedCategoryFilter || brand.category.toLowerCase() === selectedCategoryFilter.toLowerCase();
-    const matchesSearch = !searchTerm || 
-      brand.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = !searchTerm ||
+      brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (brand.description && brand.description.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
@@ -81,10 +82,10 @@ export const AnalyticsSpace: React.FC = () => {
   // ==================== PACKS STATE & MUTATIONS ====================
   const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('');
   const { data: allPacks, isLoading: loadingPacks } = usePacks(selectedBrandFilter || undefined);
-  
+
   // Also fetch all packs regardless of brand for general management when filter is empty
-  const { data: generalPacks } = usePacks(); 
-  
+  const { data: generalPacks } = usePacks();
+
   const createPackMutation = useCreatePack();
   const updatePackMutation = useUpdatePack();
   const deletePackMutation = useDeletePack();
@@ -110,10 +111,27 @@ export const AnalyticsSpace: React.FC = () => {
   // ==================== PAYMENTS STATE & MUTATIONS ====================
   const { data: allPayments, isLoading: loadingPayments } = useGetPayments();
   const verifyPaymentMutation = useVerifyPayment();
+
+  // Approve modal state
   const [approvingPayment, setApprovingPayment] = useState<PaymentRecord | null>(null);
-  const [ottUsername, setOttUsername] = useState('');
-  const [ottPassword, setOttPassword] = useState('');
+  const [approveForm, setApproveForm] = useState({ ottUsername: '', ottPassword: '' });
   const [rejectingPayment, setRejectingPayment] = useState<PaymentRecord | null>(null);
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
+
+  const approvedPayments = allPayments?.filter(p => p.status === 'Approved') || [];
+  const totalRevenue = approvedPayments.reduce((sum, p) => sum + p.amount, 0);
+  const uniqueSubscribers = new Set(
+    approvedPayments
+      .map(p => p.userId && typeof p.userId === 'object' ? p.userId._id : p.userId)
+      .filter(Boolean)
+  );
+  const activeSubscribersCount = uniqueSubscribers.size;
+
+  const totalUsersCount = new Set(
+    allPayments
+      ?.map(p => p.userId && typeof p.userId === 'object' ? p.userId._id : p.userId)
+      .filter(Boolean)
+  ).size;
 
   const categories = [
     { value: 'entertainment', label: GLOBAL_STRINGS.entertainment },
@@ -146,13 +164,6 @@ export const AnalyticsSpace: React.FC = () => {
       hoverClass: 'hover:text-emerald-200 hover:bg-emerald-500/10'
     },
     {
-      id: 'payments',
-      label: 'Payments',
-      icon: CreditCard,
-      activeClass: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_18px_rgba(59,130,246,0.35)]',
-      hoverClass: 'hover:text-blue-200 hover:bg-blue-500/10'
-    },
-    {
       id: 'payment-config',
       label: 'Payment Config',
       icon: QrCode,
@@ -171,7 +182,7 @@ export const AnalyticsSpace: React.FC = () => {
   };
 
   // ==================== HANDLERS ====================
-  
+
   const handleBrandSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!brandForm.name || !brandForm.category) return;
@@ -357,37 +368,7 @@ export const AnalyticsSpace: React.FC = () => {
     }
   };
 
-  const handleApprovePayment = async () => {
-    if (!approvingPayment || !ottUsername || !ottPassword) return;
-    try {
-      await verifyPaymentMutation.mutateAsync({
-        paymentId: approvingPayment._id,
-        status: 'Approved',
-        ottUsername,
-        ottPassword,
-      });
-      showToast('Payment Approved', 'success', `Credentials dispatched to user via email.`);
-      setApprovingPayment(null);
-      setOttUsername('');
-      setOttPassword('');
-    } catch (error: any) {
-      showToast('Action Failed', 'error', error.response?.data?.message || 'Failed to approve payment.');
-    }
-  };
 
-  const handleRejectPayment = async () => {
-    if (!rejectingPayment) return;
-    try {
-      await verifyPaymentMutation.mutateAsync({
-        paymentId: rejectingPayment._id,
-        status: 'Rejected',
-      });
-      showToast('Payment Rejected', 'error', `Payment has been marked as rejected.`);
-      setRejectingPayment(null);
-    } catch (error: any) {
-      showToast('Action Failed', 'error', error.response?.data?.message || 'Failed to reject payment.');
-    }
-  };
 
   const handleQrSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -426,11 +407,10 @@ export const AnalyticsSpace: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
-              className={`px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
-                activeTab === tab.id 
+              className={`px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${activeTab === tab.id
                   ? tab.activeClass
                   : `text-white/60 ${tab.hoverClass}`
-              }`}
+                }`}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -442,10 +422,11 @@ export const AnalyticsSpace: React.FC = () => {
       {/* OVERVIEW TAB */}
       {activeTab === 'overview' && (
         <div className="space-y-8 animate-fadeIn">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
             {[
-              { label: 'Total Platform Revenue', value: '₹1,24,500', icon: DollarSign, color: 'text-green-400' },
-              { label: 'Active Subscribers', value: '1,204', icon: Users, color: 'text-blue-400' },
+              { label: 'Total Platform Revenue', value: loadingPayments ? '...' : `₹${totalRevenue.toLocaleString('en-IN')}`, icon: DollarSign, color: 'text-green-400' },
+              { label: 'Active Subscribers', value: loadingPayments ? '...' : activeSubscribersCount.toLocaleString('en-IN'), icon: UserCheck, color: 'text-blue-400' },
+              { label: 'Total Platform Users', value: loadingPayments ? '...' : totalUsersCount.toLocaleString('en-IN'), icon: Users, color: 'text-indigo-400' },
               { label: 'Dynamic Brands', value: allBrands?.length || '0', icon: Tv, color: 'text-purple-400' },
               { label: 'Configured Packs', value: generalPacks?.length || '0', icon: Layers, color: 'text-orange-400' },
             ].map((stat, i) => (
@@ -464,14 +445,320 @@ export const AnalyticsSpace: React.FC = () => {
             ))}
           </div>
 
-          <div className="p-5 sm:p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md min-h-[280px] sm:min-h-[350px] flex flex-col items-center justify-center text-center">
-            <Activity className="w-12 h-12 text-purple-400/50 mb-3 animate-pulse" />
-            <p className="text-white/80 font-bold mb-1">Interactive Diagnostic Systems Online</p>
-            <p className="text-white/40 text-xs max-w-sm">
-              Use the sidebar mapping to view structural components. Navigate to "Channels" or "Packs" tabs above to populate dynamic platform assets in real-time.
-            </p>
+          {/* Payment Verification List */}
+          <div className="rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md overflow-hidden">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
+                  <CreditCard className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Payment Verification Queue</h3>
+                  <p className="text-white/40 text-xs">Review and approve subscriber payment requests</p>
+                </div>
+              </div>
+              {/* Filter Pills */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {(['All', 'Pending', 'Approved', 'Rejected'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setPaymentStatusFilter(f)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      paymentStatusFilter === f
+                        ? f === 'Pending' ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                          : f === 'Approved' ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                          : f === 'Rejected' ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300'
+                          : 'bg-white/10 border border-white/20 text-white'
+                        : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {f === 'All' ? `All (${allPayments?.length ?? 0})` :
+                     f === 'Pending' ? `Pending (${allPayments?.filter(p => p.status === 'Pending').length ?? 0})` :
+                     f === 'Approved' ? `Approved (${allPayments?.filter(p => p.status === 'Approved').length ?? 0})` :
+                     `Rejected (${allPayments?.filter(p => p.status === 'Rejected').length ?? 0})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* List Body */}
+            <div className="p-4 sm:p-5">
+              {loadingPayments ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                </div>
+              ) : (() => {
+                const filteredPayments = (allPayments || []).filter(p =>
+                  paymentStatusFilter === 'All' ? true : p.status === paymentStatusFilter
+                );
+                if (filteredPayments.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-14 text-center gap-3">
+                      <FileText className="w-10 h-10 text-white/20" />
+                      <p className="text-white/40 text-sm font-semibold">No {paymentStatusFilter === 'All' ? '' : paymentStatusFilter.toLowerCase()} payment requests found.</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1 custom-scrollbar custom-scrollbar-analytics">
+                    {filteredPayments.map(payment => {
+                      const user = payment.userId && typeof payment.userId === 'object' ? payment.userId : null;
+                      const bundle = payment.bundleId && typeof payment.bundleId === 'object' ? payment.bundleId : null;
+                      const isPending = payment.status === 'Pending';
+                      const isApproved = payment.status === 'Approved';
+                      return (
+                        <div
+                          key={payment._id}
+                          className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all ${
+                            isPending
+                              ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40'
+                              : isApproved
+                              ? 'bg-emerald-500/5 border-emerald-500/20'
+                              : 'bg-rose-500/5 border-rose-500/20'
+                          }`}
+                        >
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                isPending ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : isApproved ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              }`}>
+                                {payment.status.toUpperCase()}
+                              </span>
+                              <span className="text-white font-bold text-sm truncate">
+                                {user ? user.name : 'Unknown User'}
+                              </span>
+                              <span className="text-white/30 text-xs">&bull;</span>
+                              <span className="text-white/50 text-xs truncate">{user ? user.email : ''}</span>
+                            </div>
+                            <div className="flex items-center gap-3 flex-wrap text-xs text-white/50">
+                              <span className="flex items-center gap-1">
+                                <Layers className="w-3 h-3" />
+                                {bundle ? bundle.title : payment.bundleId ? `Bundle #${String(payment.bundleId)}` : 'Deleted Bundle'}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <DollarSign className="w-3 h-3 text-green-400" />
+                                <span className="text-green-300 font-bold">₹{payment.amount.toLocaleString('en-IN')}</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {new Date(payment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                            </div>
+                            <p className="text-white/30 text-[11px] mt-1 font-mono">TxID: {payment.transactionId}</p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {payment.screenshot && (
+                              <a
+                                href={`${import.meta.env.VITE_API_URL || ''}${payment.screenshot}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                                title="View Screenshot"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </a>
+                            )}
+                            {isPending && (
+                              <>
+                                <button
+                                  onClick={() => { setApprovingPayment(payment); setApproveForm({ ottUsername: '', ottPassword: '' }); }}
+                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 hover:border-emerald-500/50 text-xs font-bold transition-all cursor-pointer"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => setRejectingPayment(payment)}
+                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 hover:border-rose-500/50 text-xs font-bold transition-all cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                            {!isPending && (
+                              <span className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold ${
+                                isApproved
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              }`}>
+                                {isApproved ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldX className="w-3.5 h-3.5" />}
+                                {isApproved ? 'Verified' : 'Rejected'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
+      )}
+
+      {/* APPROVE PAYMENT MODAL */}
+      {approvingPayment && createPortal(
+        <AnimatePresence>
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setApprovingPayment(null)} />
+            <motion.div
+              className="relative w-full max-w-md bg-[#0e1a2e] border border-emerald-500/30 rounded-3xl p-6 shadow-[0_0_60px_rgba(16,185,129,0.15)] z-10"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2.5 bg-emerald-500/15 rounded-2xl border border-emerald-500/30">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-base">Approve Payment</h3>
+                  <p className="text-white/40 text-xs">
+                    {(approvingPayment.userId as any)?.name || 'User'} &bull; ₹{approvingPayment.amount.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <button onClick={() => setApprovingPayment(null)} className="ml-auto p-2 rounded-xl hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-white/50 text-xs mb-5 leading-relaxed">
+                Optionally provide OTT login credentials to send to the user via email upon approval.
+              </p>
+
+              <div className="space-y-4 mb-6">
+                <div className="space-y-1.5">
+                  <label className="text-white/50 text-xs font-bold uppercase tracking-wider">OTT Username (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. user@ottservice.com"
+                    value={approveForm.ottUsername}
+                    onChange={e => setApproveForm(f => ({ ...f, ottUsername: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-white/50 text-xs font-bold uppercase tracking-wider">OTT Password (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Pass@1234"
+                    value={approveForm.ottPassword}
+                    onChange={e => setApproveForm(f => ({ ...f, ottPassword: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setApprovingPayment(null)}
+                  className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 text-sm font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={verifyPaymentMutation.isPending}
+                  onClick={async () => {
+                    try {
+                      await verifyPaymentMutation.mutateAsync({
+                        paymentId: approvingPayment._id,
+                        status: 'Approved',
+                        ottUsername: approveForm.ottUsername || undefined,
+                        ottPassword: approveForm.ottPassword || undefined,
+                      });
+                      showToast('Payment Approved', 'success', `Payment by ${(approvingPayment.userId as any)?.name || 'user'} has been approved.`);
+                      setApprovingPayment(null);
+                    } catch (err: any) {
+                      showToast('Approval Failed', 'error', err?.response?.data?.message || 'Something went wrong.');
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-sm shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {verifyPaymentMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  Approve
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* REJECT PAYMENT MODAL */}
+      {rejectingPayment && createPortal(
+        <AnimatePresence>
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setRejectingPayment(null)} />
+            <motion.div
+              className="relative w-full max-w-sm bg-[#1a0e12] border border-rose-500/30 rounded-3xl p-6 shadow-[0_0_60px_rgba(244,63,94,0.15)] z-10"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2.5 bg-rose-500/15 rounded-2xl border border-rose-500/30">
+                  <ShieldX className="w-5 h-5 text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-base">Reject Payment?</h3>
+                  <p className="text-white/40 text-xs">This action cannot be undone.</p>
+                </div>
+                <button onClick={() => setRejectingPayment(null)} className="ml-auto p-2 rounded-xl hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-white/50 text-sm mb-6">
+                You are about to reject the payment by <span className="text-white font-bold">{(rejectingPayment.userId as any)?.name || 'this user'}</span> of <span className="text-rose-300 font-bold">₹{rejectingPayment.amount.toLocaleString('en-IN')}</span>. The user will not receive credentials.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setRejectingPayment(null)}
+                  className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 text-sm font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={verifyPaymentMutation.isPending}
+                  onClick={async () => {
+                    try {
+                      await verifyPaymentMutation.mutateAsync({
+                        paymentId: rejectingPayment._id,
+                        status: 'Rejected',
+                      });
+                      showToast('Payment Rejected', 'error', `Payment by ${(rejectingPayment.userId as any)?.name || 'user'} has been rejected.`);
+                      setRejectingPayment(null);
+                    } catch (err: any) {
+                      showToast('Rejection Failed', 'error', err?.response?.data?.message || 'Something went wrong.');
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold text-sm shadow-[0_0_20px_rgba(244,63,94,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {verifyPaymentMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldX className="w-4 h-4" />}
+                  Reject
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
       )}
 
       {/* CHANNELS / BRANDS TAB */}
@@ -523,8 +810,8 @@ export const AnalyticsSpace: React.FC = () => {
                     {isFilterDropdownOpen && (
                       <>
                         {/* Click Outside Invisible Backdrop */}
-                        <div 
-                          className="fixed inset-0 z-30" 
+                        <div
+                          className="fixed inset-0 z-30"
                           onClick={() => setIsFilterDropdownOpen(false)}
                         />
                         <motion.div
@@ -541,11 +828,10 @@ export const AnalyticsSpace: React.FC = () => {
                               setSelectedCategoryFilter('');
                               setIsFilterDropdownOpen(false);
                             }}
-                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                              !selectedCategoryFilter 
-                                ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/20' 
+                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${!selectedCategoryFilter
+                                ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/20'
                                 : 'text-white/70 hover:text-white hover:bg-white/5 border border-transparent'
-                            }`}
+                              }`}
                           >
                             All Spheres
                           </button>
@@ -570,11 +856,10 @@ export const AnalyticsSpace: React.FC = () => {
                                   setSelectedCategoryFilter(cat.value);
                                   setIsFilterDropdownOpen(false);
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer mt-0.5 border ${
-                                  isSelected 
-                                    ? getSelectedTheme(cat.value) 
+                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer mt-0.5 border ${isSelected
+                                    ? getSelectedTheme(cat.value)
                                     : `text-white/70 hover:scale-[1.02] border-transparent ${getHoverTheme(cat.value)}`
-                                }`}
+                                  }`}
                               >
                                 {cat.label}
                               </button>
@@ -620,8 +905,8 @@ export const AnalyticsSpace: React.FC = () => {
               {filteredBrands.map(brand => {
                 const config = CATEGORY_COLORS[brand.category.toLowerCase()] || CATEGORY_COLORS.discover;
                 const cName = config.colorName;
-                const badgeColor = cName === 'white' 
-                  ? 'bg-white/5 text-white/70 border-white/10' 
+                const badgeColor = cName === 'white'
+                  ? 'bg-white/5 text-white/70 border-white/10'
                   : `bg-${cName}-500/10 text-${cName}-300 border-${cName}-500/20`;
 
                 return (
@@ -637,15 +922,14 @@ export const AnalyticsSpace: React.FC = () => {
                     <div>
                       <div className="flex items-start justify-between gap-3 mb-3">
                         {brand.logo ? (
-                          <img 
-                            src={brand.logo} 
-                            alt={brand.name} 
+                          <img
+                            src={brand.logo}
+                            alt={brand.name}
                             className="w-10 h-10 rounded-xl object-cover border border-white/15 shadow-md shrink-0 bg-secondary/50"
                           />
                         ) : (
-                          <div className={`w-10 h-10 rounded-xl font-black text-base flex items-center justify-center border shrink-0 shadow-md ${
-                            cName === 'white' ? 'bg-white/10 text-white/70 border-white/20' : `bg-${cName}-500/20 text-${cName}-300 border-${cName}-500/30 shadow-${cName}-500/10`
-                          }`}>
+                          <div className={`w-10 h-10 rounded-xl font-black text-base flex items-center justify-center border shrink-0 shadow-md ${cName === 'white' ? 'bg-white/10 text-white/70 border-white/20' : `bg-${cName}-500/20 text-${cName}-300 border-${cName}-500/30 shadow-${cName}-500/10`
+                            }`}>
                             {brand.name.charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -701,7 +985,7 @@ export const AnalyticsSpace: React.FC = () => {
                     onClick={() => setIsBrandModalOpen(false)}
                     className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[999] flex items-center justify-center pointer-events-auto"
                   />
-                  
+
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9, y: 30 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -734,10 +1018,10 @@ export const AnalyticsSpace: React.FC = () => {
                     {/* Form Layout with Logo Preview */}
                     <form onSubmit={handleBrandSubmit} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                        
+
                         {/* Left Column: Form Fields */}
                         <div className="md:col-span-2 space-y-4">
-                          
+
                           {/* Channel Name */}
                           <div className="space-y-1.5">
                             <label className="text-white/60 text-xs font-bold uppercase tracking-wider">Channel Name</label>
@@ -782,12 +1066,12 @@ export const AnalyticsSpace: React.FC = () => {
                         {/* Right Column: Visual Preview Card */}
                         <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm self-start min-h-[220px] w-full text-center">
                           <span className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-4">Logo Preview</span>
-                          
+
                           {brandForm.logo ? (
                             <div className="relative group">
-                              <img 
-                                src={brandForm.logo} 
-                                alt="Logo Preview" 
+                              <img
+                                src={brandForm.logo}
+                                alt="Logo Preview"
                                 className="w-24 h-24 rounded-2xl object-cover border border-white/15 shadow-xl bg-secondary/50"
                                 onError={(e) => {
                                   (e.target as HTMLElement).style.display = 'none';
@@ -795,15 +1079,14 @@ export const AnalyticsSpace: React.FC = () => {
                               />
                             </div>
                           ) : (
-                            <div className={`w-24 h-24 rounded-2xl border flex items-center justify-center text-3xl font-black shadow-xl transition-all duration-300 ${
-                            (() => {
-                              const conf = CATEGORY_COLORS[brandForm.category] || CATEGORY_COLORS.discover;
-                              const n = conf.colorName;
-                              return n === 'white' 
-                                ? 'bg-white/10 text-white/70 border-white/20' 
-                                : `bg-${n}-500/20 text-${n}-300 border-${n}-500/30 shadow-${n}-500/10`;
-                            })()
-                          }`}>
+                            <div className={`w-24 h-24 rounded-2xl border flex items-center justify-center text-3xl font-black shadow-xl transition-all duration-300 ${(() => {
+                                const conf = CATEGORY_COLORS[brandForm.category] || CATEGORY_COLORS.discover;
+                                const n = conf.colorName;
+                                return n === 'white'
+                                  ? 'bg-white/10 text-white/70 border-white/20'
+                                  : `bg-${n}-500/20 text-${n}-300 border-${n}-500/30 shadow-${n}-500/10`;
+                              })()
+                              }`}>
                               {brandForm.name ? brandForm.name.charAt(0).toUpperCase() : '?'}
                             </div>
                           )}
@@ -874,7 +1157,7 @@ export const AnalyticsSpace: React.FC = () => {
                     onClick={() => setDeletingBrand(null)}
                     className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[999] flex items-center justify-center pointer-events-auto"
                   />
-                  
+
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -949,7 +1232,7 @@ export const AnalyticsSpace: React.FC = () => {
                     onClick={() => setDeletingPack(null)}
                     className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[999] flex items-center justify-center pointer-events-auto"
                   />
-                  
+
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1158,7 +1441,7 @@ export const AnalyticsSpace: React.FC = () => {
           <div className="lg:col-span-7 p-4 sm:p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <h3 className="text-xl font-bold text-white">Active Service Plans</h3>
-              
+
               {/* Brand Filter */}
               <div className="shrink-0 flex items-center gap-2">
                 <label className="text-white/40 text-xs whitespace-nowrap">Filter by Brand:</label>
@@ -1203,7 +1486,7 @@ export const AnalyticsSpace: React.FC = () => {
                           </span>
                         </div>
                         <p className="text-xs text-white/40 mt-1 line-clamp-1">{pack.description || 'No description.'}</p>
-                        
+
                         <div className="flex items-baseline gap-2 mt-2">
                           <span className="text-sm font-black text-white">₹{pack.price}</span>
                           {pack.originalPrice > pack.price && (
@@ -1247,260 +1530,6 @@ export const AnalyticsSpace: React.FC = () => {
         </div>
       )}
 
-
-      {/* PAYMENTS TAB */}
-      {activeTab === 'payments' && (
-        <div className="animate-fadeIn space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                <CreditCard className="w-6 h-6 text-amber-400" />
-                Payment Verification Queue
-              </h3>
-              <p className="text-white/50 text-sm mt-1">Review user payment submissions and dispatch OTT credentials upon approval.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-bold flex items-center gap-1.5">
-                <Clock className="w-3 h-3" />
-                {allPayments?.filter(p => p.status === 'Pending').length || 0} Pending
-              </span>
-            </div>
-          </div>
-
-          {loadingPayments ? (
-            <div className="py-24 flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
-              <p className="text-white/40 text-xs">Fetching payment records...</p>
-            </div>
-          ) : !allPayments || allPayments.length === 0 ? (
-            <div className="py-20 text-center rounded-3xl bg-white/5 border border-white/10 border-dashed">
-              <CreditCard className="w-12 h-12 text-white/20 mx-auto mb-3" />
-              <p className="text-white/40 text-sm italic">No payment submissions yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {allPayments.map(payment => {
-                const userName = typeof payment.userId === 'object' ? payment.userId.name : 'Unknown';
-                const userEmail = typeof payment.userId === 'object' ? payment.userId.email : '';
-                const bundleName = typeof payment.bundleId === 'object' ? payment.bundleId.title : `Bundle #${payment.bundleId}`;
-                const screenshotUrl = payment.screenshot?.startsWith('http') ? payment.screenshot : `http://localhost:5000${payment.screenshot}`;
-                const statusConfig = {
-                  Pending: { color: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/20', label: 'Pending' },
-                  Approved: { color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/20', label: 'Approved' },
-                  Rejected: { color: 'text-rose-300', bg: 'bg-rose-500/10 border-rose-500/20', label: 'Rejected' },
-                };
-                const st = statusConfig[payment.status] || statusConfig.Pending;
-
-                return (
-                  <motion.div
-                    key={payment._id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-start gap-4 flex-1 min-w-0">
-                      {/* Avatar */}
-                      <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center text-purple-300 font-black text-sm shrink-0">
-                        {userName.charAt(0).toUpperCase()}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-white font-bold text-sm truncate">{userName}</span>
-                          <span className={`px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wider ${st.bg} ${st.color}`}>
-                            {st.label}
-                          </span>
-                        </div>
-                        <p className="text-white/40 text-xs mt-0.5">{userEmail}</p>
-                        <div className="flex items-center gap-3 mt-2 flex-wrap">
-                          <span className="text-xs text-white/60 bg-white/5 border border-white/10 rounded-lg px-2 py-0.5">{bundleName}</span>
-                          <span className="text-xs font-bold text-white">₹{payment.amount}</span>
-                          <span className="text-[10px] text-white/30">{new Date(payment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        {payment.transactionId && (
-                          <p className="text-[10px] text-white/25 mt-1 font-mono">TXN: {payment.transactionId}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <a
-                        href={screenshotUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                        title="View Screenshot"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        Screenshot
-                      </a>
-                      {payment.status === 'Pending' && (
-                        <>
-                          <button
-                            onClick={() => { setApprovingPayment(payment); setOttUsername(''); setOttPassword(''); }}
-                            className="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 hover:text-emerald-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => setRejectingPayment(payment)}
-                            className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-rose-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <ShieldX className="w-3.5 h-3.5" />
-                            Reject
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* APPROVE PAYMENT MODAL (with credential input) */}
-          {createPortal(
-            <AnimatePresence>
-              {approvingPayment && (
-                <>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => setApprovingPayment(null)}
-                    className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[999] pointer-events-auto"
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                    className="fixed inset-x-3 sm:inset-x-0 top-1/2 -translate-y-1/2 sm:inset-y-0 sm:m-auto w-auto sm:w-full sm:max-w-lg h-fit max-h-[calc(100dvh-2rem)] overflow-y-auto bg-secondary border border-emerald-500/20 rounded-[24px] sm:rounded-[32px] shadow-2xl p-5 sm:p-7 z-[1000] pointer-events-auto"
-                    style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 35px rgba(52,211,153,0.1)' }}
-                  >
-                    <div className="flex items-center justify-between pb-5 border-b border-white/10 mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                          <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-white">Approve Payment</h3>
-                          <p className="text-xs text-white/40">Enter OTT credentials to dispatch to the user</p>
-                        </div>
-                      </div>
-                      <button onClick={() => setApprovingPayment(null)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer border border-white/5">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/8 mb-6 text-sm">
-                      <p className="text-white/50 text-xs mb-1 uppercase tracking-wider font-bold">Approving payment for:</p>
-                      <p className="text-white font-bold">{typeof approvingPayment.userId === 'object' ? approvingPayment.userId.name : ''}</p>
-                      <p className="text-white/40 text-xs">{typeof approvingPayment.userId === 'object' ? approvingPayment.userId.email : ''}</p>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-white/60 text-xs font-bold uppercase tracking-wider">OTT Username / Email</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. user@netflix.com or netflix_user123"
-                          value={ottUsername}
-                          onChange={e => setOttUsername(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-emerald-500/50 transition-all text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-white/60 text-xs font-bold uppercase tracking-wider">OTT Password</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Str0ngP@ssword!"
-                          value={ottPassword}
-                          onChange={e => setOttPassword(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-emerald-500/50 transition-all text-sm font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-5 border-t border-white/10 mt-6">
-                      <button
-                        type="button"
-                        onClick={() => setApprovingPayment(null)}
-                        className="flex-1 py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl text-xs hover:bg-white/10 transition-colors cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleApprovePayment}
-                        disabled={!ottUsername || !ottPassword || verifyPaymentMutation.isPending}
-                        className={`flex-1 py-3 ${actionButtonStyles.approve} disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer`}
-                      >
-                        {verifyPaymentMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <ShieldCheck className="w-4 h-4" />
-                            Approve & Send Credentials
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>,
-            document.body
-          )}
-
-          {/* REJECT PAYMENT MODAL */}
-          {createPortal(
-            <AnimatePresence>
-              {rejectingPayment && (
-                <>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => setRejectingPayment(null)}
-                    className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[999] pointer-events-auto"
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className="fixed inset-x-3 sm:inset-x-0 top-1/2 -translate-y-1/2 sm:inset-y-0 sm:m-auto w-auto sm:w-full sm:max-w-md h-fit max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[#171424] border border-rose-500/30 rounded-[24px] sm:rounded-[32px] p-5 sm:p-6 md:p-8 z-[1000] flex flex-col text-center shadow-2xl pointer-events-auto"
-                    style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 35px rgba(244,63,94,0.15)' }}
-                  >
-                    <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center border border-rose-500/25 mx-auto mb-5">
-                      <ShieldX className="w-8 h-8 text-rose-500 animate-pulse" />
-                    </div>
-                    <h3 className="text-xl font-black text-white tracking-tight mb-2">Reject Payment?</h3>
-                    <p className="text-sm text-white/60 mb-6 leading-relaxed">
-                      Are you sure you want to reject the payment from <span className="text-rose-400 font-extrabold">{typeof rejectingPayment.userId === 'object' ? rejectingPayment.userId.name : ''}</span>? The user will not receive their OTT credentials.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                      <button onClick={() => setRejectingPayment(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl text-xs transition-colors border border-white/5 cursor-pointer">
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleRejectPayment}
-                        disabled={verifyPaymentMutation.isPending}
-                        className={`flex-1 py-3 ${actionButtonStyles.danger} text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer`}
-                      >
-                        {verifyPaymentMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ShieldX className="w-3.5 h-3.5" />Confirm Reject</>}
-                      </button>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>,
-            document.body
-          )}
-        </div>
-      )}
-
       {/* PAYMENT CONFIG TAB */}
       {activeTab === 'payment-config' && (
 
@@ -1510,7 +1539,7 @@ export const AnalyticsSpace: React.FC = () => {
             Global Payment Configuration
           </h3>
           <p className="text-white/50 text-sm mb-8">Upload the master UPI or payment QR code that users will scan during checkout.</p>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10 items-start">
             <form onSubmit={handleQrSubmit} className="space-y-6">
               <div className="space-y-2">
@@ -1551,9 +1580,9 @@ export const AnalyticsSpace: React.FC = () => {
               <span className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-6">Live Checkout Preview</span>
               {qrPreview || (settings?.paymentQrUrl) ? (
                 <div className="relative p-3 bg-white rounded-2xl shadow-xl">
-                  <img 
-                    src={qrPreview || `http://localhost:5000${settings?.paymentQrUrl}`} 
-                    alt="Payment QR" 
+                  <img
+                    src={qrPreview || `http://localhost:5000${settings?.paymentQrUrl}`}
+                    alt="Payment QR"
                     className="w-48 h-48 object-contain rounded-xl"
                   />
                 </div>

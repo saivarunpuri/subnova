@@ -42,15 +42,17 @@ export const PaymentFlow = () => {
     }
   };
 
+  const isValidTxnId = transactionId.length === 12 && /^\d{12}$/.test(transactionId);
+
   const handleSubmit = async () => {
-    if (!file || !selectedBundle) return;
+    if (!file || !selectedBundle || !isValidTxnId) return;
     
     const formData = new FormData();
     formData.append('screenshot', file);
     formData.append('bundleId', selectedBundle._id);
     formData.append('amount', selectedBundle.bundlePrice.toString());
     formData.append('bundleTitle', selectedBundle.title);
-    if (transactionId) formData.append('transactionId', transactionId);
+    formData.append('transactionId', transactionId);
 
 
     try {
@@ -299,30 +301,60 @@ export const PaymentFlow = () => {
                       {/* Transaction ID Input */}
                       <div className="relative mb-auto">
                         <input 
-                          type="text" 
+                          type="text"
+                          inputMode="numeric"
                           id="txnId"
                           value={transactionId}
-                          onChange={(e) => setTransactionId(e.target.value)}
-                          className="w-full bg-transparent border-b-2 border-white/10 focus:border-white py-4 px-2 text-white font-medium text-lg outline-none transition-colors peer placeholder-transparent" 
+                          maxLength={12}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 12);
+                            setTransactionId(val);
+                          }}
+                          className={`w-full bg-transparent border-b-2 py-4 px-2 text-white font-medium text-lg outline-none transition-colors peer placeholder-transparent ${
+                            transactionId.length === 0
+                              ? 'border-white/10 focus:border-white'
+                              : isValidTxnId
+                              ? 'border-emerald-500 focus:border-emerald-400'
+                              : 'border-rose-500/70 focus:border-rose-400'
+                          }`}
                           placeholder="Transaction ID" 
                         />
                         <label 
                           htmlFor="txnId"
                           className="absolute left-2 top-4 text-white/30 text-lg font-medium transition-all peer-focus:-top-4 peer-focus:text-xs peer-focus:text-white/60 peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:text-white/60 pointer-events-none"
                         >
-                          Transaction ID (Optional, 12-digits)
+                          Transaction ID
                         </label>
+                        {/* Live counter + validation hint */}
+                        <div className="flex items-center justify-between mt-2">
+                          <p className={`text-xs transition-colors ${
+                            transactionId.length === 0 ? 'text-white/30'
+                            : isValidTxnId ? 'text-emerald-400'
+                            : 'text-rose-400'
+                          }`}>
+                            {transactionId.length === 0
+                              ? 'Enter your 12-digit UPI transaction ID'
+                              : isValidTxnId
+                              ? '✓ Valid transaction ID'
+                              : `${12 - transactionId.length} more digit${12 - transactionId.length !== 1 ? 's' : ''} needed`}
+                          </p>
+                          <span className={`text-xs font-mono tabular-nums ${
+                            isValidTxnId ? 'text-emerald-400' : 'text-white/30'
+                          }`}>
+                            {transactionId.length}/12
+                          </span>
+                        </div>
                       </div>
 
                       <button
                         onClick={handleSubmit}
-                        disabled={!file || submitPaymentMutation.isPending}
+                        disabled={!file || !isValidTxnId || submitPaymentMutation.isPending}
                         className={`w-full mt-8 sm:mt-10 py-4 sm:py-5 rounded-2xl font-black text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-2 shadow-2xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
-                          file 
+                          file && isValidTxnId
                             ? 'text-white' 
                             : 'bg-white/5 text-white/30 cursor-not-allowed shadow-none'
                         }`}
-                        style={file ? { 
+                        style={file && isValidTxnId ? { 
                           background: `linear-gradient(135deg, ${theme.themeColor}, #000000)`,
                           boxShadow: `0 15px 40px -10px ${theme.glowColor}`
                         } : {}}
