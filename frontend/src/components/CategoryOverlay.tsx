@@ -96,7 +96,7 @@ export const CategoryOverlay: React.FC<CategoryOverlayProps> = ({ category }) =>
       y: -8, 
       scale: 1.03,
       boxShadow: "0 20px 30px rgba(0,0,0,0.4), 0 0 25px rgba(255,255,255,0.1)",
-      transition: { type: "spring", stiffness: 300, damping: 15 }
+      transition: { type: "spring" as const, stiffness: 300, damping: 15 }
     }
   };
 

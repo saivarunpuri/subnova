@@ -135,7 +135,6 @@ export const BundiAssistant = () => {
                   className="w-full border border-white/10 rounded-full py-3 pl-4 pr-12 text-sm text-white placeholder-white/25 focus:outline-none transition-all"
                   style={{
                     background: 'rgba(255,255,255,0.05)',
-                    focusBorderColor: '#00D9F5',
                   }}
                   onFocus={e => e.target.style.borderColor = 'rgba(0,217,245,0.4)'}
                   onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
