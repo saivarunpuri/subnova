@@ -3,7 +3,12 @@ import { seedDefaultData } from '../utils/seeder';
 
 export const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/ottbundle');
+    const conn = await mongoose.connect(
+      process.env.MONGO_URI || 'mongodb://localhost:27017/ottbundle',
+      {
+        serverSelectionTimeoutMS: 5000 // 5 seconds timeout
+      }
+    );
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     
     // Seed default channels and packages
