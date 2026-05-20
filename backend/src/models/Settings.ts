@@ -13,4 +13,4 @@ const SettingsSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model<ISettings>('Settings', SettingsSchema);
+export default mongoose.models.Settings || mongoose.model<ISettings>('Settings', SettingsSchema);

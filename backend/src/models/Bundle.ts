@@ -20,4 +20,4 @@ const BundleSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model<IBundle>('Bundle', BundleSchema);
+export default mongoose.models.Bundle || mongoose.model<IBundle>('Bundle', BundleSchema);

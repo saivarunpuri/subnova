@@ -18,4 +18,4 @@ const OTTBrandSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model<IOTTBrand>('OTTBrand', OTTBrandSchema);
+export default mongoose.models.OTTBrand || mongoose.model<IOTTBrand>('OTTBrand', OTTBrandSchema);

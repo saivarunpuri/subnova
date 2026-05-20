@@ -24,4 +24,4 @@ const PackSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model<IPack>('Pack', PackSchema);
+export default mongoose.models.Pack || mongoose.model<IPack>('Pack', PackSchema);
