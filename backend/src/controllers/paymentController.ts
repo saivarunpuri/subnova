@@ -20,6 +20,7 @@ export const submitPayment = async (req: AuthRequest, res: Response): Promise<vo
     const payment = new Payment({
       userId: req.user._id,
       bundleId,
+      bundleTitle: bundleTitle || '',
       screenshot: screenshotUrl,
       transactionId,
       amount,
@@ -62,6 +63,8 @@ export const verifyPayment = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     payment.status = status;
+    if (status === 'Approved' && ottUsername) payment.ottUsername = ottUsername;
+    if (status === 'Approved' && ottPassword) payment.ottPassword = ottPassword;
     const updatedPayment = await payment.save();
 
     // 📧 If Approved, send credentials to the user via email
@@ -99,7 +102,19 @@ export const getPayments = async (req: AuthRequest, res: Response): Promise<void
 
     const payments = await Payment.find(filter)
       .populate('userId', 'name email')
-      .populate('bundleId', 'title')
+      .populate({ path: 'bundleId', select: 'title price brand validity', populate: { path: 'brand', select: 'name category' } })
+      .sort({ createdAt: -1 });
+
+    res.json(payments);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getMyPayments = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const payments = await Payment.find({ userId: req.user._id })
+      .populate({ path: 'bundleId', select: 'title price brand validity', populate: { path: 'brand', select: 'name category' } })
       .sort({ createdAt: -1 });
 
     res.json(payments);

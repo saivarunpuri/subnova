@@ -504,7 +504,10 @@ export const AnalyticsSpace: React.FC = () => {
                   <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1 custom-scrollbar custom-scrollbar-analytics">
                     {filteredPayments.map(payment => {
                       const user = payment.userId && typeof payment.userId === 'object' ? payment.userId : null;
-                      const bundle = payment.bundleId && typeof payment.bundleId === 'object' ? payment.bundleId : null;
+                      const pack = payment.bundleId && typeof payment.bundleId === 'object' ? payment.bundleId as any : null;
+                      const bundleDisplayName = pack
+                        ? (pack.brand?.name ? `${pack.brand.name} - ${pack.title}` : pack.title)
+                        : (payment as any).bundleTitle || 'Unknown Bundle';
                       const isPending = payment.status === 'Pending';
                       const isApproved = payment.status === 'Approved';
                       return (
@@ -537,7 +540,7 @@ export const AnalyticsSpace: React.FC = () => {
                             <div className="flex items-center gap-3 flex-wrap text-xs text-white/50">
                               <span className="flex items-center gap-1">
                                 <Layers className="w-3 h-3" />
-                                {bundle ? bundle.title : payment.bundleId ? `Bundle #${String(payment.bundleId)}` : 'Deleted Bundle'}
+                                {bundleDisplayName}
                               </span>
                               <span className="flex items-center gap-1">
                                 <DollarSign className="w-3 h-3 text-green-400" />

@@ -56,6 +56,30 @@ export const useVerifyPayment = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['myPayments'] });
+    },
+  });
+};
+
+export interface MyPaymentRecord {
+  _id: string;
+  bundleId: { _id: string; title: string; validity?: string; brand?: { _id: string; name: string; category?: string } } | string | null;
+  bundleTitle?: string;
+  screenshot: string;
+  transactionId: string;
+  amount: number;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  ottUsername?: string;
+  ottPassword?: string;
+  createdAt: string;
+}
+
+export const useGetMyPayments = () => {
+  return useQuery<MyPaymentRecord[]>({
+    queryKey: ['myPayments'],
+    queryFn: async () => {
+      const { data } = await api.get('/payments/my');
+      return data;
     },
   });
 };
