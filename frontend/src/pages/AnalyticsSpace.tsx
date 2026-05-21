@@ -108,6 +108,27 @@ export const AnalyticsSpace: React.FC = () => {
   });
   const [editingPackId, setEditingPackId] = useState<string | null>(null);
   const [deletingPack, setDeletingPack] = useState<PackData | null>(null);
+  
+  // Searchable brand selector state
+  const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
+  const [brandSearchQuery, setBrandSearchQuery] = useState('');
+  const brandDropdownRef = React.useRef<HTMLDivElement>(null);
+  const selectedBrand = allBrands?.find(b => b._id === packForm.brand);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (brandDropdownRef.current && !brandDropdownRef.current.contains(event.target as Node)) {
+        setIsBrandDropdownOpen(false);
+      }
+    };
+    if (isBrandDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isBrandDropdownOpen]);
+
 
   // ==================== SETTINGS STATE & MUTATIONS ====================
   const { data: settings, isLoading: loadingSettings } = useSettings();
@@ -1437,22 +1458,180 @@ export const AnalyticsSpace: React.FC = () => {
             </h3>
 
             <form onSubmit={handlePackSubmit} className="space-y-3">
-              <div className="space-y-1">
+              <div className="space-y-1" ref={brandDropdownRef}>
                 <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Parent Brand</label>
-                <select
-                  required
-                  value={packForm.brand}
-                  onChange={e => setPackForm({ ...packForm, brand: e.target.value })}
-                  className="w-full bg-secondary border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-purple-500/50 transition-all text-sm"
-                >
-                  <option value="" className="bg-secondary text-white/40">Select OTT Brand...</option>
-                  {allBrands?.map(brand => (
-                    <option key={brand._id} value={brand._id} className="bg-secondary text-white">
-                      {brand.name} ({brand.category})
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  {/* Trigger Panel */}
+                  <button
+                    type="button"
+                    onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
+                    className="w-full bg-[#090f1d] border border-white/10 rounded-xl py-2 px-3 text-white flex items-center justify-between focus:outline-none focus:border-purple-500/50 hover:border-white/25 hover:bg-[#0f192f] transition-all text-sm text-left shadow-inner"
+                  >
+                    {selectedBrand ? (
+                      <span className="flex items-center gap-2">
+                        {/* Dynamic Category Glowing Dot */}
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_8px_currentColor] animate-pulse"
+                          style={{
+                            color: CATEGORY_COLORS[selectedBrand.category.toLowerCase()]?.themeColor || '#fff',
+                            backgroundColor: CATEGORY_COLORS[selectedBrand.category.toLowerCase()]?.themeColor || '#fff'
+                          }}
+                        />
+                        <span className="font-semibold text-white/90">{selectedBrand.name}</span>
+                        <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
+                          {selectedBrand.category}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-white/40">Select OTT Brand...</span>
+                    )}
+                    <ChevronDown
+                      className={`w-4 h-4 text-white/40 transition-transform duration-300 ${
+                        isBrandDropdownOpen ? 'rotate-180 text-white/80' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Hidden Input for Form HTML5 Validation */}
+                  <input
+                    type="text"
+                    tabIndex={-1}
+                    required
+                    value={packForm.brand}
+                    onChange={() => {}}
+                    className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+                  />
+
+                  {/* Floating Popover Dropdown Menu */}
+                  <AnimatePresence>
+                    {isBrandDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        className="absolute z-50 left-0 right-0 mt-1.5 bg-[#090f1e]/98 border border-white/12 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col"
+                      >
+                        {/* Search Input Container */}
+                        <div className="p-2 border-b border-white/5 flex items-center gap-2 bg-white/[0.01]">
+                          <Search className="w-4 h-4 text-white/30 shrink-0 ml-1" />
+                          <input
+                            type="text"
+                            placeholder="Search brands or categories..."
+                            value={brandSearchQuery}
+                            onChange={e => setBrandSearchQuery(e.target.value)}
+                            className="w-full bg-white/5 border border-white/5 rounded-xl py-1.5 px-3 text-xs text-white placeholder-white/35 focus:outline-none focus:border-purple-500/40 focus:bg-white/10 transition-all"
+                            autoFocus
+                            onClick={e => e.stopPropagation()} // Prevent closing dropdown when clicking search
+                          />
+                          {brandSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBrandSearchQuery('');
+                              }}
+                              className="p-1 hover:bg-white/5 rounded-lg text-white/40 hover:text-white transition-all mr-1"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Scrollable Stack */}
+                        <div
+                          className={`max-h-56 overflow-y-auto p-1 custom-scrollbar custom-scrollbar-${(
+                            selectedBrand?.category || 'analytics'
+                          ).toLowerCase()}`}
+                        >
+                          {/* Option to clear selection */}
+                          <div
+                            onClick={() => {
+                              setPackForm({ ...packForm, brand: '' });
+                              setIsBrandDropdownOpen(false);
+                              setBrandSearchQuery('');
+                            }}
+                            className={`px-3 py-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-all duration-200 ${
+                              !packForm.brand
+                                ? 'bg-white/10 text-white font-bold'
+                                : 'text-white/60 hover:bg-white/5 hover:text-white'
+                            }`}
+                          >
+                            <span>Clear Selection (None)</span>
+                            {!packForm.brand && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                          </div>
+
+                          <div className="h-[1px] bg-white/5 my-1" />
+
+                          {/* Filtered Brands */}
+                          {(() => {
+                            const filtered = allBrands?.filter(brand =>
+                              brand.name.toLowerCase().includes(brandSearchQuery.toLowerCase()) ||
+                              brand.category.toLowerCase().includes(brandSearchQuery.toLowerCase())
+                            ) || [];
+
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="py-6 text-center text-xs text-white/30">
+                                  No OTT brands found
+                                </div>
+                              );
+                            }
+
+                            return filtered.map(brand => {
+                              const isSelected = packForm.brand === brand._id;
+                              const catColor = CATEGORY_COLORS[brand.category.toLowerCase()]?.themeColor || '#fff';
+                              return (
+                                <div
+                                  key={brand._id}
+                                  onClick={() => {
+                                    setPackForm({ ...packForm, brand: brand._id });
+                                    setIsBrandDropdownOpen(false);
+                                    setBrandSearchQuery('');
+                                  }}
+                                  className={`group px-3 py-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-all duration-200 my-0.5 ${
+                                    isSelected
+                                      ? 'bg-purple-500/10 text-purple-300 font-bold border border-purple-500/20'
+                                      : 'text-white/80 hover:bg-white/5 hover:text-white'
+                                  }`}
+                                  style={{
+                                    borderColor: isSelected ? `${catColor}33` : undefined,
+                                    backgroundColor: isSelected ? `${catColor}15` : undefined,
+                                    color: isSelected ? catColor : undefined
+                                  }}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span
+                                      className="w-2 h-2 rounded-full shrink-0 group-hover:scale-115 transition-transform duration-200 shadow-[0_0_6px_currentColor]"
+                                      style={{
+                                        color: catColor,
+                                        backgroundColor: catColor
+                                      }}
+                                    />
+                                    <span>{brand.name}</span>
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest px-1 py-0.5 rounded bg-white/5">
+                                      {brand.category}
+                                    </span>
+                                    {isSelected && (
+                                      <Check
+                                        className="w-3.5 h-3.5 font-bold"
+                                        style={{ color: catColor }}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
+
 
               <div className="space-y-1">
                 <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Pack Title</label>
