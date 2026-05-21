@@ -10,6 +10,8 @@ export interface IPayment extends Document {
   status: 'Pending' | 'Approved' | 'Rejected';
   ottUsername?: string;
   ottPassword?: string;
+  couponCode?: string;
+  discountAmount?: number;
   createdAt: Date;
 }
 
@@ -24,6 +26,8 @@ const PaymentSchema: Schema = new Schema(
     status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
     ottUsername: { type: String, default: '' },
     ottPassword: { type: String, default: '' },
+    couponCode: { type: String, default: '' },
+    discountAmount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

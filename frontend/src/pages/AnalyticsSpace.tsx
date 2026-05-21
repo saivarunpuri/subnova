@@ -26,7 +26,8 @@ import {
   Eye,
   ShieldCheck,
   ShieldX,
-  Clock
+  Clock,
+  Percent
 } from 'lucide-react';
 import {
   useBrands,
@@ -45,8 +46,14 @@ import { useToast } from '../context/ToastContext';
 import type { ToastType } from '../context/ToastContext';
 import { CATEGORY_COLORS, GLOBAL_STRINGS } from '../constants/theme';
 import { useSettings, useUpdatePaymentQr } from '../hooks/useSettings';
+import {
+  useCoupons,
+  useCreateCoupon,
+  useUpdateCoupon,
+  useDeleteCoupon,
+} from '../hooks/useCoupons';
 
-type Tab = 'overview' | 'brands' | 'packs' | 'payment-config';
+type Tab = 'overview' | 'brands' | 'packs' | 'payment-config' | 'coupons';
 
 export const AnalyticsSpace: React.FC = () => {
   const { showToast } = useToast();
@@ -112,6 +119,72 @@ export const AnalyticsSpace: React.FC = () => {
   const { data: allPayments, isLoading: loadingPayments } = useGetPayments();
   const verifyPaymentMutation = useVerifyPayment();
 
+  // ==================== COUPONS STATE & MUTATIONS ====================
+  const { data: coupons, isLoading: loadingCoupons } = useCoupons();
+  const createCouponMutation = useCreateCoupon();
+  const updateCouponMutation = useUpdateCoupon();
+  const deleteCouponMutation = useDeleteCoupon();
+
+  const [couponForm, setCouponForm] = useState({
+    code: '',
+    discountType: 'percentage' as 'percentage' | 'fixed',
+    discountValue: 0,
+    expiryDate: '',
+    isActive: true
+  });
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [deletingCoupon, setDeletingCoupon] = useState<any | null>(null);
+
+  const handleCouponSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponForm.code || !couponForm.discountType || !couponForm.discountValue || !couponForm.expiryDate) return;
+
+    try {
+      if (editingCouponId) {
+        await updateCouponMutation.mutateAsync({
+          id: editingCouponId,
+          code: couponForm.code,
+          discountType: couponForm.discountType,
+          discountValue: couponForm.discountValue,
+          expiryDate: couponForm.expiryDate,
+          isActive: couponForm.isActive
+        });
+        showToast(
+          "Coupon Updated",
+          "success",
+          `Successfully modified coupon code '${couponForm.code}'.`
+        );
+        setEditingCouponId(null);
+      } else {
+        await createCouponMutation.mutateAsync({
+          code: couponForm.code,
+          discountType: couponForm.discountType,
+          discountValue: couponForm.discountValue,
+          expiryDate: couponForm.expiryDate,
+          isActive: couponForm.isActive
+        });
+        showToast(
+          "Coupon Created",
+          "success",
+          `Successfully initialized new coupon '${couponForm.code}'.`
+        );
+      }
+      setCouponForm({
+        code: '',
+        discountType: 'percentage',
+        discountValue: 0,
+        expiryDate: '',
+        isActive: true
+      });
+    } catch (error: any) {
+      showToast(
+        "Action Failed",
+        "error",
+        error.response?.data?.message || error.message || "An unexpected error occurred."
+      );
+    }
+  };
+
   // Approve modal state
   const [approvingPayment, setApprovingPayment] = useState<PaymentRecord | null>(null);
   const [approveForm, setApproveForm] = useState({ ottUsername: '', ottPassword: '' });
@@ -169,6 +242,13 @@ export const AnalyticsSpace: React.FC = () => {
       icon: QrCode,
       activeClass: 'bg-gradient-to-r from-fuchsia-500 to-violet-500 text-white shadow-[0_0_18px_rgba(217,70,239,0.35)]',
       hoverClass: 'hover:text-fuchsia-200 hover:bg-fuchsia-500/10'
+    },
+    {
+      id: 'coupons',
+      label: 'Coupons / Discounts',
+      icon: Percent,
+      activeClass: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-[0_0_18px_rgba(245,158,11,0.35)]',
+      hoverClass: 'hover:text-amber-200 hover:bg-amber-500/10'
     }
   ];
 
@@ -178,6 +258,7 @@ export const AnalyticsSpace: React.FC = () => {
     pack: 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-[0_0_15px_rgba(16,185,129,0.25)]',
     approve: 'bg-gradient-to-r from-lime-500 to-emerald-500 hover:from-lime-400 hover:to-emerald-400 shadow-[0_0_15px_rgba(132,204,22,0.22)]',
     qr: 'bg-gradient-to-r from-fuchsia-500 to-violet-500 hover:from-fuchsia-400 hover:to-violet-400 shadow-[0_0_15px_rgba(217,70,239,0.22)]',
+    coupon: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-[0_0_15px_rgba(245,158,11,0.22)]',
     danger: 'bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 shadow-[0_0_15px_rgba(244,63,94,0.25)]'
   };
 
@@ -368,7 +449,41 @@ export const AnalyticsSpace: React.FC = () => {
     }
   };
 
+  const handleEditCoupon = (coupon: any) => {
+    setEditingCouponId(coupon._id);
+    setCouponForm({
+      code: coupon.code,
+      discountType: coupon.discountType,
+      discountValue: coupon.discountValue,
+      expiryDate: coupon.expiryDate ? coupon.expiryDate.split('T')[0] : '',
+      isActive: coupon.isActive
+    });
+  };
 
+  const handleDeleteCoupon = (coupon: any) => {
+    setDeletingCoupon(coupon);
+  };
+
+  const confirmDeleteCoupon = async () => {
+    if (!deletingCoupon) return;
+    const couponCode = deletingCoupon.code;
+    try {
+      await deleteCouponMutation.mutateAsync(deletingCoupon._id);
+      showToast(
+        "Coupon Deleted",
+        "success",
+        `Successfully deleted coupon code '${couponCode}'.`
+      );
+    } catch (error: any) {
+      showToast(
+        "Delete Failed",
+        "error",
+        error.response?.data?.message || error.message || "An unexpected error occurred."
+      );
+    } finally {
+      setDeletingCoupon(null);
+    }
+  };
 
   const handleQrSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1598,6 +1713,247 @@ export const AnalyticsSpace: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* COUPONS TAB */}
+      {activeTab === 'coupons' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start animate-fadeIn max-w-6xl mx-auto">
+          {/* Coupon Configuration Form */}
+          <div className="lg:col-span-5 p-4 sm:p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-amber-400" />
+              {editingCouponId ? 'Modify Coupon' : 'Configure Coupon'}
+            </h3>
+
+            <form onSubmit={handleCouponSubmit} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Coupon Code</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. SAVE50, FESTIVE100"
+                  value={couponForm.code}
+                  onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-amber-500/50 transition-all text-sm uppercase"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Discount Type</label>
+                  <select
+                    value={couponForm.discountType}
+                    onChange={e => setCouponForm({ ...couponForm, discountType: e.target.value as 'percentage' | 'fixed' })}
+                    className="w-full bg-primary border border-white/10 rounded-xl py-2.5 px-3 text-white focus:outline-none focus:border-amber-500/50 transition-all text-sm cursor-pointer"
+                  >
+                    <option value="percentage" className="bg-secondary text-white">Percentage (%)</option>
+                    <option value="fixed" className="bg-secondary text-white">Fixed Amount (₹)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Discount Value</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    placeholder={couponForm.discountType === 'percentage' ? 'e.g. 50' : 'e.g. 100'}
+                    value={couponForm.discountValue || ''}
+                    onChange={e => setCouponForm({ ...couponForm, discountValue: Number(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-amber-500/50 transition-all text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Expiration Date</label>
+                <input
+                  type="date"
+                  required
+                  value={couponForm.expiryDate}
+                  onChange={e => setCouponForm({ ...couponForm, expiryDate: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-amber-500/50 transition-all text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 py-2">
+                <input
+                  type="checkbox"
+                  id="coupon-active"
+                  checked={couponForm.isActive}
+                  onChange={e => setCouponForm({ ...couponForm, isActive: e.target.checked })}
+                  className="w-4 h-4 rounded bg-white/5 border-white/10 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 focus:outline-none cursor-pointer"
+                />
+                <label htmlFor="coupon-active" className="text-white/70 text-xs font-bold uppercase tracking-wider cursor-pointer">
+                  Is Coupon Active
+                </label>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="submit"
+                  disabled={createCouponMutation.isPending || updateCouponMutation.isPending}
+                  className={`flex-1 py-2.5 ${actionButtonStyles.coupon} text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer`}
+                >
+                  {(createCouponMutation.isPending || updateCouponMutation.isPending) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      {editingCouponId ? 'Update Coupon' : 'Create Coupon'}
+                    </>
+                  )}
+                </button>
+                {editingCouponId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCouponId(null);
+                      setCouponForm({
+                        code: '',
+                        discountType: 'percentage',
+                        discountValue: 0,
+                        expiryDate: '',
+                        isActive: true
+                      });
+                    }}
+                    className="px-4 py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl text-sm hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Coupons List */}
+          <div className="lg:col-span-7 p-4 sm:p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h3 className="text-xl font-bold text-white">Active & Pending Coupons</h3>
+            </div>
+
+            {loadingCoupons ? (
+              <div className="py-12 flex justify-center">
+                <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+              </div>
+            ) : !coupons || coupons.length === 0 ? (
+              <div className="py-12 text-center text-white/40 italic text-sm">
+                No coupon codes found. Generate one using the form on the left.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[min(500px,60dvh)] overflow-y-auto pr-1 custom-scrollbar custom-scrollbar-analytics">
+                {coupons.map(coupon => {
+                  const isExpired = new Date(coupon.expiryDate) < new Date();
+                  return (
+                    <div
+                      key={coupon._id}
+                      className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-start justify-between gap-4"
+                    >
+                      <div className="overflow-hidden">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-base font-bold text-white tracking-wider font-mono">{coupon.code}</h4>
+                          <span className={`px-2 py-0.5 rounded-full border text-[9px] font-bold ${
+                            coupon.isActive && !isExpired
+                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                              : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                          }`}>
+                            {coupon.isActive ? (isExpired ? 'Expired' : 'Active') : 'Inactive'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] text-white/50">
+                            Expires: {new Date(coupon.expiryDate).toLocaleDateString()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-baseline gap-2 mt-2">
+                          <span className="text-sm font-black text-white">
+                            Discount: {coupon.discountType === 'percentage' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                        <button
+                          onClick={() => handleEditCoupon(coupon)}
+                          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
+                          title="Edit Coupon"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCoupon(coupon)}
+                          className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                          title="Delete Coupon"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* DELETE COUPON CONFIRMATION MODAL */}
+      {createPortal(
+        <AnimatePresence>
+          {deletingCoupon && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setDeletingCoupon(null)}
+                className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[999] flex items-center justify-center pointer-events-auto"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="fixed inset-x-3 sm:inset-x-0 top-1/2 -translate-y-1/2 sm:inset-y-0 sm:m-auto w-auto sm:w-full sm:max-w-md h-fit max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[#171424] border border-rose-500/30 rounded-[24px] sm:rounded-[32px] p-5 sm:p-6 md:p-8 z-[1000] flex flex-col text-center shadow-2xl pointer-events-auto"
+                style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 35px rgba(244,63,94,0.15)' }}
+              >
+                <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center border border-rose-500/25 mx-auto mb-5">
+                  <AlertTriangle className="w-8 h-8 text-rose-500 animate-pulse" />
+                </div>
+
+                <h3 className="text-xl font-black text-white tracking-tight mb-2">Confirm Coupon Deletion</h3>
+                <p className="text-sm text-white/60 mb-5 leading-relaxed">
+                  Are you sure you want to permanently delete the coupon code <span className="text-rose-400 font-extrabold">{deletingCoupon.code}</span>? This action cannot be undone.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingCoupon(null)}
+                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl text-xs transition-colors border border-white/5 cursor-pointer"
+                  >
+                    Keep Coupon
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDeleteCoupon}
+                    disabled={deleteCouponMutation.isPending}
+                    className={`flex-1 py-3 ${actionButtonStyles.danger} text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer`}
+                  >
+                    {deleteCouponMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Confirm Purge
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
     </div>
   );

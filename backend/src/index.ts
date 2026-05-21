@@ -11,6 +11,7 @@ import bundleRoutes from './routes/bundleRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import ottRoutes from './routes/ottRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import couponRoutes from './routes/couponRoutes';
 import path from 'path';
 
 dotenv.config();
@@ -39,6 +40,7 @@ app.use('/api/bundles', bundleRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/ott', ottRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/coupons', couponRoutes);
 
 // Statically serve the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

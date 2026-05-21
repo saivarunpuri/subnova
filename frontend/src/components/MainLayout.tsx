@@ -130,7 +130,7 @@ export const MainLayout: React.FC = () => {
                 </div>
               )}
               {['entertainment', 'education', 'music', 'productivity', 'creator', 'discover'].includes(activeSpace) && (
-                <div className={`pointer-events-none w-full h-full p-4 sm:p-6 lg:p-8 pt-24 sm:pt-28 pb-32 sm:pb-40 flex items-start sm:items-center justify-center lg:justify-end lg:pr-24 overflow-y-auto custom-scrollbar custom-scrollbar-${activeSpace}`}>
+                <div className={`pointer-events-none relative w-full h-full p-4 sm:p-6 lg:p-8 pt-24 sm:pt-28 pb-32 sm:pb-40 flex items-start sm:items-center justify-center lg:justify-end lg:pr-24 overflow-y-auto custom-scrollbar custom-scrollbar-${activeSpace}`}>
                   <CategoryOverlay category={activeSpace} />
                 </div>
               )}

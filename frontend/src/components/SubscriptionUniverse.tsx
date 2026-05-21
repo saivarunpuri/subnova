@@ -76,15 +76,44 @@ const CameraController = () => {
   const activeSpace = useUIStore((state) => state.activeSpace);
 
   useEffect(() => {
-    const targetPlanet = PLANETS[activeSpace as keyof typeof PLANETS] || PLANETS.discover;
+    const updatePosition = () => {
+      const targetPlanet = PLANETS[activeSpace as keyof typeof PLANETS] || PLANETS.discover;
+      const isMobile = window.innerWidth < 1024;
+      
+      let shiftX = 0;
+      let shiftY = 0;
+      let zoomZ = 9;
 
-    gsap.to(camera.position, {
-      x: targetPlanet.position[0] * 0.6,
-      y: targetPlanet.position[1] * 0.4,
-      z: targetPlanet.position[2] + 9,
-      duration: 2.2,
-      ease: 'power3.inOut'
-    });
+      if (activeSpace === 'discover' || activeSpace === 'dashboard' || activeSpace === 'profile') {
+        shiftX = 0;
+        shiftY = 0;
+        zoomZ = 9;
+      } else {
+        if (isMobile) {
+          // On mobile, keep planet centered but shift slightly upwards to clear bottom space dock navigation
+          shiftX = 0;
+          shiftY = -0.5;
+          zoomZ = 6.8;
+        } else {
+          // On desktop, shift active planet to the left half of the screen so it is completely visible beside the right-hand card
+          shiftX = 2.4;
+          shiftY = 0;
+          zoomZ = 5.8;
+        }
+      }
+
+      gsap.to(camera.position, {
+        x: targetPlanet.position[0] + shiftX,
+        y: targetPlanet.position[1] + shiftY,
+        z: targetPlanet.position[2] + zoomZ,
+        duration: 2.2,
+        ease: 'power3.inOut'
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    return () => window.removeEventListener('resize', updatePosition);
   }, [activeSpace, camera]);
 
   return null;
@@ -133,7 +162,7 @@ const AuroraParticles = () => {
 
 export const SubscriptionUniverse = () => {
   const { activeSpace, setActiveSpace } = useUIStore();
-  const visiblePlanets = Object.entries(PLANETS).filter(([key]) => key !== 'productivity');
+  const visiblePlanets = Object.entries(PLANETS).filter(([key]) => key !== 'profile');
 
   return (
     <Canvas

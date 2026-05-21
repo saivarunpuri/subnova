@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useBrands, usePacks } from '../hooks/useOTT';
 import type { OTTBrandData, PackData } from '../hooks/useOTT';
 import { useUIStore } from '../store/uiStore';
+import { CATEGORY_COLORS, DEFAULT_CATEGORY_COLOR } from '../constants/theme';
 import { 
   ArrowLeft, 
   Tv, 
@@ -114,26 +115,38 @@ export const CategoryOverlay: React.FC<CategoryOverlayProps> = ({ category }) =>
     );
   }
 
+  const isGridView = brands && brands.length > 5 && !selectedBrand;
+  const categoryColor = CATEGORY_COLORS[category.toLowerCase()] || DEFAULT_CATEGORY_COLOR;
+
   return (
     <div 
       ref={containerRef}
-      className="w-full max-w-lg relative z-20 pointer-events-auto"
+      className={`w-full relative z-20 pointer-events-auto transition-all duration-500 ${
+        isGridView 
+          ? 'max-w-6xl mx-auto lg:absolute lg:left-16 lg:right-16 lg:top-24 lg:max-w-none lg:w-auto' 
+          : 'max-w-lg'
+      }`}
       onClick={(e) => e.stopPropagation()}
     >
       <AnimatePresence mode="wait">
         {!selectedBrand ? (
           // BRANDS LIST
           <motion.div
-            key="brands-list"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            className="bg-secondary/45 border border-white/10 backdrop-blur-2xl rounded-3xl p-5 sm:p-6 md:p-8 shadow-2xl relative overflow-hidden"
+            key={isGridView ? "brands-grid" : "brands-list"}
+            initial={{ opacity: 0, y: isGridView ? 30 : 0, x: isGridView ? 0 : 50 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: isGridView ? -30 : 0, x: isGridView ? 0 : -50 }}
+            transition={{ type: "spring", damping: 25, stiffness: 180 }}
+            className="bg-secondary/45 border border-white/10 backdrop-blur-2xl rounded-3xl p-5 sm:p-6 md:p-8 shadow-2xl relative overflow-hidden animate-fadeIn"
+            style={isGridView ? { boxShadow: `0 30px 100px -20px ${categoryColor.themeColor}33, inset 0 0 0 1px rgba(255,255,255,0.05)` } : {}}
           >
             {/* Background Glow */}
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div 
+              className="absolute -top-24 -left-24 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20"
+              style={{ backgroundColor: categoryColor.themeColor }}
+            />
 
-            <div className="flex items-start justify-between gap-4 mb-5 sm:mb-6">
+            <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <span className="text-xs uppercase tracking-widest text-white/40 font-bold">Quadrant Category</span>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-white capitalize tracking-tight mt-0.5">
@@ -141,7 +154,7 @@ export const CategoryOverlay: React.FC<CategoryOverlayProps> = ({ category }) =>
                 </h2>
               </div>
               <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
-                <Tv className="w-6 h-6 text-white/80" />
+                <Tv className="w-6 h-6 text-white/80" style={{ color: categoryColor.themeColor }} />
               </div>
             </div>
 
@@ -156,45 +169,47 @@ export const CategoryOverlay: React.FC<CategoryOverlayProps> = ({ category }) =>
                 <p className="text-xs text-white/30">An admin can initialize dynamic services via the Analytics Space.</p>
               </div>
             ) : (
-              <motion.div 
-                variants={brandListVariants}
-                initial="hidden"
-                animate="show"
-                className="grid grid-cols-1 gap-4"
-              >
-                {brands.map((brand) => (
-                  <motion.div
-                    key={brand._id}
-                    variants={brandCardVariants}
-                    whileHover="hover"
-                    onClick={() => navigate(`/${category}/${brand._id}`)}
-                    className="p-3.5 sm:p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md cursor-pointer flex items-center justify-between gap-3 transition-all group"
-                  >
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                      {brand.logo ? (
-                        <img 
-                          src={brand.logo} 
-                          alt={brand.name} 
-                          className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover border border-white/10 shrink-0"
-                        />
-                      ) : (
-                        <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${getCategoryColor(category)} flex items-center justify-center font-bold text-white shadow-lg shrink-0`}>
-                          {brand.name.charAt(0).toUpperCase()}
+              <div className={`max-h-[min(280px,40dvh)] sm:max-h-[min(480px,50dvh)] overflow-y-auto pr-1.5 pb-2 custom-scrollbar custom-scrollbar-${category.toLowerCase()}`}>
+                <motion.div 
+                  variants={brandListVariants}
+                  initial="hidden"
+                  animate="show"
+                  className={isGridView ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6" : "grid grid-cols-1 gap-4"}
+                >
+                  {brands.map((brand) => (
+                    <motion.div
+                      key={brand._id}
+                      variants={brandCardVariants}
+                      whileHover="hover"
+                      onClick={() => navigate(`/${category}/${brand._id}`)}
+                      className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md cursor-pointer flex items-center justify-between gap-3 transition-all group"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        {brand.logo ? (
+                          <img 
+                            src={brand.logo} 
+                            alt={brand.name} 
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover border border-white/10 shrink-0"
+                          />
+                        ) : (
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br ${getCategoryColor(category)} flex items-center justify-center font-bold text-white shadow-lg shrink-0`}>
+                            {brand.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-purple-300 transition-colors truncate">
+                            {brand.name}
+                          </h3>
+                          <p className="text-xs text-white/50 line-clamp-1">
+                            {brand.description || 'Custom service provider bundle.'}
+                          </p>
                         </div>
-                      )}
-                      <div className="min-w-0">
-                        <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-purple-300 transition-colors truncate">
-                          {brand.name}
-                        </h3>
-                        <p className="text-xs text-white/50 line-clamp-1">
-                          {brand.description || 'Custom service provider bundle.'}
-                        </p>
                       </div>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-white/30 group-hover:text-white group-hover:translate-x-1 transition-all" />
-                  </motion.div>
-                ))}
-              </motion.div>
+                      <ChevronRight className="w-5 h-5 text-white/30 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </div>
             )}
           </motion.div>
         ) : (
@@ -247,7 +262,7 @@ export const CategoryOverlay: React.FC<CategoryOverlayProps> = ({ category }) =>
                 <p className="text-xs text-white/30">An admin can configure packs under this channel in the Analytics Space.</p>
               </div>
             ) : (
-              <div className={`space-y-4 max-h-[min(450px,55dvh)] overflow-y-auto pr-1 custom-scrollbar custom-scrollbar-${category.toLowerCase()}`}>
+              <div className={`space-y-4 max-h-[min(280px,38dvh)] sm:max-h-[min(450px,55dvh)] overflow-y-auto pr-1 pb-1 custom-scrollbar custom-scrollbar-${category.toLowerCase()}`}>
                 {packs.map((pack) => {
                   const discountPercent = Math.round(
                     ((pack.originalPrice - pack.price) / pack.originalPrice) * 100

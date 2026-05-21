@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import Payment from '../models/Payment';
 import User from '../models/User';
+import Coupon from '../models/Coupon';
+import Pack from '../models/Pack';
 import { AuthRequest } from '../middleware/auth';
 import { notifyAdminOfPayment, sendUserOTTCredentials } from '../services/emailService';
 
@@ -8,7 +10,7 @@ import { notifyAdminOfPayment, sendUserOTTCredentials } from '../services/emailS
 
 export const submitPayment = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { bundleId, transactionId, amount, bundleTitle } = req.body;
+    const { bundleId, transactionId, amount, bundleTitle, couponCode } = req.body;
     
     if (!req.file) {
       res.status(400).json({ message: 'Screenshot is required' });
@@ -17,14 +19,58 @@ export const submitPayment = async (req: AuthRequest, res: Response): Promise<vo
 
     const screenshotUrl = `/uploads/${req.file.filename}`;
 
+    let finalAmount = Number(amount);
+    let discountAmount = 0;
+
+    if (couponCode) {
+      const cleanCouponCode = couponCode.toUpperCase().trim();
+      const coupon = await Coupon.findOne({ code: cleanCouponCode, isActive: true });
+      if (!coupon) {
+        res.status(400).json({ message: 'Invalid or inactive coupon code' });
+        return;
+      }
+
+      // Check expiry
+      if (new Date(coupon.expiryDate) < new Date()) {
+        res.status(400).json({ message: 'This coupon has expired' });
+        return;
+      }
+
+      // Check if user has already used this coupon (Pending or Approved payment)
+      const existingPayment = await Payment.findOne({
+        userId: req.user._id,
+        couponCode: cleanCouponCode,
+        status: { $in: ['Pending', 'Approved'] }
+      });
+      if (existingPayment) {
+        res.status(400).json({ message: 'You have already used this coupon code' });
+        return;
+      }
+
+      // Calculate discount dynamically based on pack price
+      const pack = await Pack.findById(bundleId);
+      if (pack) {
+        const originalPrice = pack.price;
+        if (coupon.discountType === 'percentage') {
+          discountAmount = Math.round((originalPrice * coupon.discountValue) / 100);
+        } else {
+          discountAmount = coupon.discountValue;
+        }
+        discountAmount = Math.min(discountAmount, originalPrice);
+        finalAmount = Math.max(0, originalPrice - discountAmount);
+      }
+    }
+
     const payment = new Payment({
       userId: req.user._id,
       bundleId,
       bundleTitle: bundleTitle || '',
       screenshot: screenshotUrl,
       transactionId,
-      amount,
-      status: 'Pending'
+      amount: finalAmount,
+      status: 'Pending',
+      couponCode: couponCode ? couponCode.toUpperCase().trim() : '',
+      discountAmount
     });
 
     const savedPayment = await payment.save();

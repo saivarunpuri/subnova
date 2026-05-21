@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/uiStore';
 import { QrCode, Upload, CheckCircle2, ArrowRight, X, Loader2, Orbit, ShieldCheck, Sparkles, ChevronLeft } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import { useSubmitPayment } from '../../hooks/usePayment';
+import { useValidateCoupon } from '../../hooks/useCoupons';
 import { CATEGORY_COLORS, DEFAULT_CATEGORY_COLOR } from '../../constants/theme';
 
 export const PaymentFlow = () => {
@@ -18,6 +19,26 @@ export const PaymentFlow = () => {
   
   const { data: settings } = useSettings();
   const submitPaymentMutation = useSubmitPayment();
+  const validateCouponMutation = useValidateCoupon();
+
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCodeInput || !selectedBundle) return;
+    setCouponError('');
+    try {
+      const res = await validateCouponMutation.mutateAsync({
+        code: couponCodeInput,
+        packId: selectedBundle._id
+      });
+      setAppliedCoupon(res);
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      setCouponError(err.response?.data?.message || 'Invalid coupon code');
+    }
+  };
 
   const theme = selectedBundle?.category ? CATEGORY_COLORS[selectedBundle.category.toLowerCase()] || DEFAULT_CATEGORY_COLOR : DEFAULT_CATEGORY_COLOR;
   const cName = theme.colorName;
@@ -29,6 +50,9 @@ export const PaymentFlow = () => {
       setFile(null);
       setTransactionId('');
       setSelectedBundle(null);
+      setCouponCodeInput('');
+      setCouponError('');
+      setAppliedCoupon(null);
     }, 400);
 
     if (location.pathname.startsWith('/pack/')) {
@@ -50,10 +74,12 @@ export const PaymentFlow = () => {
     const formData = new FormData();
     formData.append('screenshot', file);
     formData.append('bundleId', selectedBundle._id);
-    formData.append('amount', selectedBundle.bundlePrice.toString());
+    formData.append('amount', (appliedCoupon ? appliedCoupon.discountedPrice : selectedBundle.bundlePrice).toString());
     formData.append('bundleTitle', selectedBundle.title);
     formData.append('transactionId', transactionId);
-
+    if (appliedCoupon) {
+      formData.append('couponCode', appliedCoupon.code);
+    }
 
     try {
       await submitPaymentMutation.mutateAsync(formData);
@@ -125,10 +151,24 @@ export const PaymentFlow = () => {
                   </h2>
 
                   {/* Price Breakdown */}
-                  <div className="flex items-baseline gap-2 mb-5 sm:mb-8 lg:mb-10">
-                    <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tighter" style={{ textShadow: `0 0 40px ${theme.glowColor}` }}>
-                      ₹{selectedBundle?.bundlePrice || 499}
-                    </span>
+                  <div className="flex items-baseline gap-2 mb-5 sm:mb-8 lg:mb-10 flex-wrap">
+                    {appliedCoupon ? (
+                      <>
+                        <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tighter" style={{ textShadow: `0 0 40px ${theme.glowColor}` }}>
+                          ₹{appliedCoupon.discountedPrice}
+                        </span>
+                        <span className="text-xl sm:text-2xl font-bold text-white/30 line-through">
+                          ₹{selectedBundle?.bundlePrice}
+                        </span>
+                        <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-md">
+                          -{appliedCoupon.discountType === 'percentage' ? `${appliedCoupon.discountValue}%` : `₹${appliedCoupon.discountValue}`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tighter" style={{ textShadow: `0 0 40px ${theme.glowColor}` }}>
+                        ₹{selectedBundle?.bundlePrice || 499}
+                      </span>
+                    )}
                     <span className="text-white/40 font-medium">/ term</span>
                   </div>
 
@@ -299,7 +339,7 @@ export const PaymentFlow = () => {
                       </label>
 
                       {/* Transaction ID Input */}
-                      <div className="relative mb-auto">
+                      <div className="relative mb-6">
                         <input 
                           type="text"
                           inputMode="numeric"
@@ -344,6 +384,64 @@ export const PaymentFlow = () => {
                             {transactionId.length}/12
                           </span>
                         </div>
+                      </div>
+
+                      {/* Coupon Code Input */}
+                      <div className="mt-4 mb-auto border-t border-white/5 pt-6">
+                        <label className="block text-white/50 text-xs font-bold uppercase tracking-wider mb-2">Have a coupon code?</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={couponCodeInput}
+                            disabled={!!appliedCoupon}
+                            onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                            placeholder="ENTER CODE (e.g. SAVE50)"
+                            className={`flex-1 bg-white/5 border rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none transition-all ${
+                              appliedCoupon 
+                                ? 'border-emerald-500/40 focus:border-emerald-500/50 bg-emerald-500/5' 
+                                : couponError 
+                                ? 'border-rose-500/40 focus:border-rose-500/50' 
+                                : 'border-white/10 focus:border-white/30'
+                            }`}
+                          />
+                          {appliedCoupon ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAppliedCoupon(null);
+                                setCouponCodeInput('');
+                              }}
+                              className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-rose-400 hover:text-rose-300 font-bold text-xs transition-all cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={!couponCodeInput || validateCouponMutation.isPending}
+                              onClick={handleApplyCoupon}
+                              className={`px-5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                couponCodeInput 
+                                  ? 'bg-white text-black hover:bg-white/90' 
+                                  : 'bg-white/5 text-white/30 border border-white/10 cursor-not-allowed shadow-none'
+                              }`}
+                            >
+                              {validateCouponMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                              Apply
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Coupon validation message */}
+                        {couponError && (
+                          <p className="text-rose-400 text-xs mt-2 font-medium">✗ {couponError}</p>
+                        )}
+                        {appliedCoupon && (
+                          <p className="text-emerald-400 text-xs mt-2 font-medium flex items-center gap-1.5 animate-pulse">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            ✓ Success! Coupon applied. You saved ₹{appliedCoupon.discountAmount}.
+                          </p>
+                        )}
                       </div>
 
                       <button
