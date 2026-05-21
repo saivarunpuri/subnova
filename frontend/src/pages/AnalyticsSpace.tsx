@@ -451,11 +451,22 @@ export const AnalyticsSpace: React.FC = () => {
 
   const handleEditCoupon = (coupon: any) => {
     setEditingCouponId(coupon._id);
+    
+    // Format UTC ISO string from backend to local YYYY-MM-DDThh:mm format for datetime-local input
+    let localExpiry = '';
+    if (coupon.expiryDate) {
+      const date = new Date(coupon.expiryDate);
+      if (!isNaN(date.getTime())) {
+        const tzOffset = date.getTimezoneOffset() * 60000;
+        localExpiry = new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+      }
+    }
+
     setCouponForm({
       code: coupon.code,
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
-      expiryDate: coupon.expiryDate ? coupon.expiryDate.split('T')[0] : '',
+      expiryDate: localExpiry,
       isActive: coupon.isActive
     });
   };
@@ -1766,13 +1777,13 @@ export const AnalyticsSpace: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Expiration Date</label>
+                <label className="text-white/60 text-[10px] font-bold uppercase tracking-wider">Expiration Date & Time</label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   required
                   value={couponForm.expiryDate}
                   onChange={e => setCouponForm({ ...couponForm, expiryDate: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-amber-500/50 transition-all text-sm"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all text-sm cursor-pointer"
                 />
               </div>
 
@@ -1860,7 +1871,14 @@ export const AnalyticsSpace: React.FC = () => {
                             {coupon.isActive ? (isExpired ? 'Expired' : 'Active') : 'Inactive'}
                           </span>
                           <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] text-white/50">
-                            Expires: {new Date(coupon.expiryDate).toLocaleDateString()}
+                            Expires: {new Date(coupon.expiryDate).toLocaleString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
                           </span>
                         </div>
 

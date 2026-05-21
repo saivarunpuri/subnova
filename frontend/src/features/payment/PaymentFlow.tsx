@@ -273,6 +273,64 @@ export const PaymentFlow = () => {
                         </div>
                       </div>
 
+                      {/* Coupon Code Input in Step 1 */}
+                      <div className="w-full mb-6 border-t border-white/5 pt-6 text-left">
+                        <label className="block text-white/50 text-xs font-bold uppercase tracking-wider mb-2">Have a coupon code?</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={couponCodeInput}
+                            disabled={!!appliedCoupon}
+                            onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                            placeholder="ENTER CODE (e.g. SAVE50)"
+                            className={`flex-1 bg-white/5 border rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none transition-all ${
+                              appliedCoupon 
+                                ? 'border-emerald-500/40 focus:border-emerald-500/50 bg-emerald-500/5' 
+                                : couponError 
+                                ? 'border-rose-500/40 focus:border-rose-500/50' 
+                                : 'border-white/10 focus:border-white/30'
+                            }`}
+                          />
+                          {appliedCoupon ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAppliedCoupon(null);
+                                setCouponCodeInput('');
+                              }}
+                              className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-rose-400 hover:text-rose-300 font-bold text-xs transition-all cursor-pointer whitespace-nowrap"
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={!couponCodeInput || validateCouponMutation.isPending}
+                              onClick={handleApplyCoupon}
+                              className={`px-5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                                couponCodeInput 
+                                  ? 'bg-white text-black hover:bg-white/90' 
+                                  : 'bg-white/5 text-white/30 border border-white/10 cursor-not-allowed shadow-none'
+                              }`}
+                            >
+                              {validateCouponMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                              Apply
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Coupon validation message */}
+                        {couponError && (
+                          <p className="text-rose-400 text-xs mt-2 font-medium">✗ {couponError}</p>
+                        )}
+                        {appliedCoupon && (
+                          <p className="text-emerald-400 text-xs mt-2 font-medium flex items-center gap-1.5 animate-pulse">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            ✓ Success! Coupon applied. You saved ₹{appliedCoupon.discountAmount}.
+                          </p>
+                        )}
+                      </div>
+
                       <button
                         onClick={() => setStep(2)}
                         className="w-full py-4 sm:py-5 mt-auto rounded-2xl font-black text-sm tracking-wide text-primary transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_10px_40px_-10px_rgba(255,255,255,0.3)] hover:scale-[1.02] active:scale-[0.98]"

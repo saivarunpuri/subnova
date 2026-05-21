@@ -220,3 +220,26 @@
 .custom-scrollbar-bundi::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 0 14px rgba(0,245,160,0.6);
 }
+
+/* =====================================================
+   CUSTOM DATETIME-LOCAL INPUT STYLING
+   ===================================================== */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.6) sepia(1) saturate(5) hue-rotate(15deg); /* Styles calendar/clock icon to neon amber */
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px;
+  transition: all 0.2s ease-in-out;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.85) sepia(1) saturate(8) hue-rotate(15deg);
+  background: rgba(245, 158, 11, 0.2);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+/* Custom styling for standard dark-theme datetime inputs */
+input[type="datetime-local"] {
+  color-scheme: dark; /* Native helper to render date-picker dropdown inside browser in dark mode */
+}
+
