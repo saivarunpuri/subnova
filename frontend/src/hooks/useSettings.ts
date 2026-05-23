@@ -4,6 +4,7 @@ import api from '../services/api';
 export interface SettingsData {
   _id: string;
   paymentQrUrl: string;
+  upiId?: string;
 }
 
 // Fetch global settings
