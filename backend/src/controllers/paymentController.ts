@@ -5,6 +5,7 @@ import Coupon from '../models/Coupon';
 import Pack from '../models/Pack';
 import { AuthRequest } from '../middleware/auth';
 import { notifyAdminOfPayment, sendUserOTTCredentials } from '../services/emailService';
+import { uploadToImageKit } from '../services/imagekitService';
 
 // Note: Cloudinary should be configured with env vars in index.ts or config/cloudinary.ts
 
@@ -17,7 +18,9 @@ export const submitPayment = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const screenshotUrl = `/uploads/${req.file.filename}`;
+    // Upload the in-memory buffer to ImageKit
+    const screenshotUrl = await uploadToImageKit(req.file.buffer, req.file.originalname);
+
 
     let finalAmount = Number(amount);
     let discountAmount = 0;

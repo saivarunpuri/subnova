@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUIStore } from '../../store/uiStore';
-import { QrCode, Upload, CheckCircle2, ArrowRight, X, Loader2, Orbit, ShieldCheck, Sparkles, ChevronLeft } from 'lucide-react';
+import { QrCode, Upload, CheckCircle2, ArrowRight, X, Loader2, Orbit, ShieldCheck, Sparkles, ChevronLeft, Copy, Check } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import { useSubmitPayment } from '../../hooks/usePayment';
 import { useValidateCoupon } from '../../hooks/useCoupons';
@@ -16,6 +16,14 @@ export const PaymentFlow = () => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [transactionId, setTransactionId] = useState('');
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
+  const handleCopyUpi = () => {
+    if (!settings?.upiId) return;
+    navigator.clipboard.writeText(settings.upiId);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2000);
+  };
   
   const { data: settings } = useSettings();
   const submitPaymentMutation = useSubmitPayment();
@@ -259,7 +267,13 @@ export const PaymentFlow = () => {
                           {/* The QR Image */}
                           <div className="w-44 h-44 sm:w-56 sm:h-56 lg:w-64 lg:h-64 bg-white rounded-2xl p-3 relative z-10">
                             <img 
-                              src={settings?.paymentQrUrl ? `http://localhost:5000${settings.paymentQrUrl}` : "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=UPI_ID_HERE"} 
+                              src={
+                                settings?.paymentQrUrl
+                                  ? settings.paymentQrUrl.startsWith('http')
+                                    ? settings.paymentQrUrl
+                                    : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${settings.paymentQrUrl}`
+                                  : "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=UPI_ID_HERE"
+                              } 
                               alt="Payment QR" 
                               className="w-full h-full object-contain rounded-xl" 
                             />
@@ -272,6 +286,37 @@ export const PaymentFlow = () => {
                           <div className="absolute bottom-6 right-6 w-4 h-4 border-b-2 border-r-2 opacity-50" style={{ borderColor: theme.themeColor }} />
                         </div>
                       </div>
+
+                      {/* Copy UPI Address Card */}
+                      {settings?.upiId && (
+                        <div className="w-full max-w-sm mb-7 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col items-center gap-2">
+                          <span className="text-[10px] text-white/40 uppercase tracking-widest font-black">Or Transfer to UPI Address Directly</span>
+                          <div className="w-full flex items-center justify-between gap-3 bg-[#0d091a] border border-white/5 rounded-xl p-2 mt-1 font-mono text-xs">
+                            <span className="text-white font-bold select-all truncate pl-2">{settings.upiId}</span>
+                            <button
+                              type="button"
+                              onClick={handleCopyUpi}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[10px] tracking-wide transition-all cursor-pointer shrink-0 ${
+                                copiedUpi
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10'
+                              }`}
+                            >
+                              {copiedUpi ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  Copy ID
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Coupon Code Input in Step 1 */}
                       <div className="w-full mb-6 border-t border-white/5 pt-6 text-left">

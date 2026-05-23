@@ -135,6 +135,13 @@ export const AnalyticsSpace: React.FC = () => {
   const updateSettingsMutation = useUpdatePaymentQr();
   const [qrFile, setQrFile] = useState<File | null>(null);
   const [qrPreview, setQrPreview] = useState<string>('');
+  const [upiIdInput, setUpiIdInput] = useState<string>('');
+
+  React.useEffect(() => {
+    if (settings?.upiId) {
+      setUpiIdInput(settings.upiId);
+    }
+  }, [settings]);
 
   // ==================== PAYMENTS STATE & MUTATIONS ====================
   const { data: allPayments, isLoading: loadingPayments } = useGetPayments();
@@ -519,26 +526,29 @@ export const AnalyticsSpace: React.FC = () => {
 
   const handleQrSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!qrFile) {
-      showToast("Missing File", "error", "Please select a QR code image to upload.");
+    if (!qrFile && !upiIdInput.trim()) {
+      showToast("Missing Settings", "error", "Please select a QR code image or enter a UPI address to update.");
       return;
     }
 
     const formData = new FormData();
-    formData.append('qrCode', qrFile);
+    if (qrFile) {
+      formData.append('qrCode', qrFile);
+    }
+    formData.append('upiId', upiIdInput.trim());
 
     try {
       await updateSettingsMutation.mutateAsync(formData);
-      showToast("Settings Updated", "success", "Payment QR code has been successfully updated.");
+      showToast("Settings Updated", "success", "Payment configurations successfully saved.");
       setQrFile(null);
       setQrPreview('');
     } catch (error: any) {
-      showToast("Upload Failed", "error", error.response?.data?.message || "Failed to update payment settings.");
+      showToast("Update Failed", "error", error.response?.data?.message || "Failed to update payment settings.");
     }
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto pb-12 overflow-x-hidden">
+    <div className="w-full max-w-6xl mx-auto pb-36 overflow-x-hidden">
       <div className="mb-6 sm:mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
@@ -705,7 +715,7 @@ export const AnalyticsSpace: React.FC = () => {
                           <div className="flex items-center gap-2 shrink-0">
                             {payment.screenshot && (
                               <a
-                                href={`${import.meta.env.VITE_API_URL || ''}${payment.screenshot}`}
+                                href={payment.screenshot.startsWith('http') ? payment.screenshot : `${import.meta.env.VITE_API_URL || ''}${payment.screenshot}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
@@ -784,6 +794,28 @@ export const AnalyticsSpace: React.FC = () => {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* In-Modal Screenshot Review */}
+              {approvingPayment.screenshot && (
+                <div className="mb-5 rounded-2xl border border-white/10 overflow-hidden bg-black/40 p-2 text-center">
+                  <span className="text-[10px] text-white/40 uppercase tracking-widest font-black block mb-2">Submitted Screenshot Proof</span>
+                  <a
+                    href={approvingPayment.screenshot.startsWith('http') ? approvingPayment.screenshot : `${import.meta.env.VITE_API_URL || ''}${approvingPayment.screenshot}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative block overflow-hidden rounded-xl border border-white/5 bg-[#171424] cursor-zoom-in"
+                  >
+                    <img
+                      src={approvingPayment.screenshot.startsWith('http') ? approvingPayment.screenshot : `${import.meta.env.VITE_API_URL || ''}${approvingPayment.screenshot}`}
+                      alt="Payment screenshot proof"
+                      className="w-full max-h-48 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                      <span className="px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 text-white text-[10px] font-bold">Open Fullscreen ↗</span>
+                    </div>
+                  </a>
+                </div>
+              )}
 
               <p className="text-white/50 text-xs mb-5 leading-relaxed">
                 Optionally provide OTT login credentials to send to the user via email upon approval.
@@ -1841,7 +1873,7 @@ export const AnalyticsSpace: React.FC = () => {
       {/* PAYMENT CONFIG TAB */}
       {activeTab === 'payment-config' && (
 
-        <div className="p-4 sm:p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl animate-fadeIn max-w-4xl mx-auto">
+        <div className="p-4 sm:p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl animate-fadeIn max-w-4xl mx-auto mb-20">
           <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
             <QrCode className="w-5 h-5 text-emerald-400" />
             Global Payment Configuration
@@ -1850,8 +1882,20 @@ export const AnalyticsSpace: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10 items-start">
             <form onSubmit={handleQrSubmit} className="space-y-6">
+              <div className="space-y-1.5">
+                <label className="text-white/60 text-xs font-bold uppercase tracking-wider block">Merchant UPI Address (VPA)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. businessname@okaxis, merchant@upi"
+                  value={upiIdInput}
+                  onChange={e => setUpiIdInput(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-emerald-500/50 transition-all text-sm"
+                />
+                <p className="text-[10px] text-white/30">Provide a text-based UPI ID that users can easily copy-paste during checkout on mobile or desktop.</p>
+              </div>
+
               <div className="space-y-2">
-                <label className="text-white/60 text-xs font-bold uppercase tracking-wider block">Upload New QR Code Image</label>
+                <label className="text-white/60 text-xs font-bold uppercase tracking-wider block">Upload New QR Code Image (Optional)</label>
                 <div className="relative">
                   <input
                     type="file"
@@ -1870,7 +1914,7 @@ export const AnalyticsSpace: React.FC = () => {
               </div>
               <button
                 type="submit"
-                disabled={!qrFile || updateSettingsMutation.isPending}
+                disabled={(!qrFile && upiIdInput.trim() === (settings?.upiId || '')) || updateSettingsMutation.isPending}
                 className={`w-full py-3.5 ${actionButtonStyles.qr} disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer`}
               >
                 {updateSettingsMutation.isPending ? (
@@ -1878,7 +1922,7 @@ export const AnalyticsSpace: React.FC = () => {
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    Save Active QR Code
+                    Save Payment Settings
                   </>
                 )}
               </button>
@@ -1889,7 +1933,7 @@ export const AnalyticsSpace: React.FC = () => {
               {qrPreview || (settings?.paymentQrUrl) ? (
                 <div className="relative p-3 bg-white rounded-2xl shadow-xl">
                   <img
-                    src={qrPreview || `http://localhost:5000${settings?.paymentQrUrl}`}
+                    src={qrPreview || (settings?.paymentQrUrl ? (settings.paymentQrUrl.startsWith('http') ? settings.paymentQrUrl : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${settings.paymentQrUrl}`) : '')}
                     alt="Payment QR"
                     className="w-48 h-48 object-contain rounded-xl"
                   />

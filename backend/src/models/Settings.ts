@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ISettings extends Document {
   paymentQrUrl: string;
+  upiId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -9,6 +10,7 @@ export interface ISettings extends Document {
 const SettingsSchema: Schema = new Schema(
   {
     paymentQrUrl: { type: String, default: '' },
+    upiId: { type: String, default: '' },
   },
   { timestamps: true }
 );

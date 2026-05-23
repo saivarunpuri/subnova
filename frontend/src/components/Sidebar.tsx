@@ -193,7 +193,7 @@ export const Sidebar = () => {
         </svg>
 
         {/* Foreground Content: Layout matching the curves */}
-        <div className="w-full h-full flex items-center sm:items-start justify-between gap-0.5 sm:gap-1 md:gap-2 overflow-visible px-1.5 py-2 sm:px-3 md:px-6 lg:px-10 relative z-10 bg-transparent border-0 rounded-3xl sm:rounded-none">
+        <div className="w-full h-full flex items-center sm:items-start justify-between gap-0.5 sm:gap-1 md:gap-2 overflow-visible px-2.5 py-2 sm:px-3 md:px-6 lg:px-10 relative z-10 bg-slate-950/85 sm:bg-transparent border border-white/10 sm:border-0 rounded-2xl sm:rounded-none backdrop-blur-xl sm:backdrop-blur-none shadow-[0_8px_32px_rgba(0,0,0,0.5)] sm:shadow-none">
           {items.map((item, idx) => {
             // Calculate mathematical offset along the sine wave
             const t = items.length > 1 ? idx / (items.length - 1) : 0.5;

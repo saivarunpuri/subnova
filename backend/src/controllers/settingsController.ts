@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Settings from '../models/Settings';
 import { AuthRequest } from '../middleware/auth';
+import { uploadToImageKit } from '../services/imagekitService';
 
 // Get the global settings (singleton)
 export const getSettings = async (req: Request, res: Response): Promise<void> => {
@@ -8,7 +9,7 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
     let settings = await Settings.findOne();
     if (!settings) {
       // Create default if it doesn't exist
-      settings = new Settings({ paymentQrUrl: '' });
+      settings = new Settings({ paymentQrUrl: '', upiId: '' });
       await settings.save();
     }
     res.json(settings);
@@ -22,12 +23,17 @@ export const updateSettings = async (req: AuthRequest, res: Response): Promise<v
   try {
     let settings = await Settings.findOne();
     if (!settings) {
-      settings = new Settings({ paymentQrUrl: '' });
+      settings = new Settings({ paymentQrUrl: '', upiId: '' });
+    }
+
+    if (req.body.upiId !== undefined) {
+      settings.upiId = req.body.upiId;
     }
 
     if (req.file) {
-      // Storing path that is accessible via express.static
-      settings.paymentQrUrl = `/uploads/${req.file.filename}`;
+      // Upload the parsed in-memory buffer to ImageKit
+      const imageUrl = await uploadToImageKit(req.file.buffer, req.file.originalname);
+      settings.paymentQrUrl = imageUrl;
     }
 
     const updatedSettings = await settings.save();
@@ -36,3 +42,4 @@ export const updateSettings = async (req: AuthRequest, res: Response): Promise<v
     res.status(500).json({ message: error.message });
   }
 };
+
